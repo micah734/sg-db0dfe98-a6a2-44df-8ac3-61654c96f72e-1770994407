@@ -61,8 +61,8 @@ export default function ProjectWorkspace() {
       setLoading(true);
       const [projectData, docs, media] = await Promise.all([
         projectService.getProject(projectId),
-        documentService.getDocumentsByProject(projectId),
-        mediaService.getMediaByProject(projectId)
+        documentService.getDocuments(projectId),
+        mediaService.getMediaFiles(projectId)
       ]);
 
       setProject(projectData);
@@ -346,11 +346,7 @@ export default function ProjectWorkspace() {
 
           {/* Right Panel - Media */}
           <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
-            <MediaPanel 
-              mediaFiles={mediaFiles}
-              selectedMedia={selectedMedia}
-              onMediaSelect={setSelectedMedia}
-            />
+            <MediaPanel media={selectedMedia} />
           </ResizablePanel>
         </ResizablePanelGroup>
 

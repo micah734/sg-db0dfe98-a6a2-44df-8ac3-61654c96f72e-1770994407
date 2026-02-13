@@ -72,6 +72,7 @@ export function MediaPanel({ media }: MediaPanelProps) {
   if (!media) return null;
 
   const isVideo = media.file_type.startsWith("video");
+  const mediaUrl = mediaService.getMediaUrl(media.storage_path);
 
   return (
     <div className="h-full flex flex-col bg-white border-l border-slate-200">
@@ -80,10 +81,11 @@ export function MediaPanel({ media }: MediaPanelProps) {
         {isVideo ? (
           <video
             ref={mediaRef as React.RefObject<HTMLVideoElement>}
-            src={media.storage_path}
+            src={mediaUrl}
             className="w-full rounded-lg"
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={handleLoadedMetadata}
+            controls
           />
         ) : (
           <div className="aspect-video bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
@@ -94,43 +96,45 @@ export function MediaPanel({ media }: MediaPanelProps) {
         {!isVideo && (
           <audio
             ref={mediaRef as React.RefObject<HTMLAudioElement>}
-            src={media.storage_path}
+            src={mediaUrl}
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={handleLoadedMetadata}
             className="hidden"
           />
         )}
 
-        {/* Controls */}
-        <div className="mt-3 space-y-2">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handlePlayPause}
-              className="text-white hover:bg-white/10"
-            >
-              {isPlaying ? (
-                <Pause className="w-4 h-4" />
-              ) : (
-                <Play className="w-4 h-4" />
-              )}
-            </Button>
-            <div className="flex-1">
-              <input
-                type="range"
-                min={0}
-                max={duration || 100}
-                value={currentTime}
-                onChange={(e) => jumpToTime(Number(e.target.value))}
-                className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
-              />
+        {/* Controls for Audio (Video has native controls) */}
+        {!isVideo && (
+          <div className="mt-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handlePlayPause}
+                className="text-white hover:bg-white/10"
+              >
+                {isPlaying ? (
+                  <Pause className="w-4 h-4" />
+                ) : (
+                  <Play className="w-4 h-4" />
+                )}
+              </Button>
+              <div className="flex-1">
+                <input
+                  type="range"
+                  min={0}
+                  max={duration || 100}
+                  value={currentTime}
+                  onChange={(e) => jumpToTime(Number(e.target.value))}
+                  className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+              <span className="text-xs text-white/70 min-w-[5rem] text-right">
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </span>
             </div>
-            <span className="text-xs text-white/70 min-w-[5rem] text-right">
-              {formatTime(currentTime)} / {formatTime(duration)}
-            </span>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Tabs */}
