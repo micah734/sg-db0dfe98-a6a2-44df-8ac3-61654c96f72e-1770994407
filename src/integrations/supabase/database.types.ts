@@ -337,25 +337,43 @@ export type Database = {
       }
       transcripts: {
         Row: {
-          content: string
           created_at: string | null
+          error_message: string | null
+          full_text: string
           id: string
+          language: string | null
           media_file_id: string
+          project_id: string | null
           segments: Json | null
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
         }
         Insert: {
-          content: string
           created_at?: string | null
+          error_message?: string | null
+          full_text: string
           id?: string
+          language?: string | null
           media_file_id: string
+          project_id?: string | null
           segments?: Json | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
-          content?: string
           created_at?: string | null
+          error_message?: string | null
+          full_text?: string
           id?: string
+          language?: string | null
           media_file_id?: string
+          project_id?: string | null
           segments?: Json | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -363,6 +381,13 @@ export type Database = {
             columns: ["media_file_id"]
             isOneToOne: false
             referencedRelation: "media_files"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transcripts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
