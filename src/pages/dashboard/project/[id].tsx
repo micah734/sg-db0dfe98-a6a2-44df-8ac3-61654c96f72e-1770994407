@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
+import dynamic from "next/dynamic";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { DocumentViewer } from "@/components/workspace/DocumentViewer";
 import { MediaPanel } from "@/components/workspace/MediaPanel";
 import { AnnotationToolbar } from "@/components/workspace/AnnotationToolbar";
 import { projectService } from "@/services/projectService";
@@ -34,6 +34,19 @@ import {
   Trash2
 } from "lucide-react";
 import { SEO } from "@/components/SEO";
+
+// Dynamic import for DocumentViewer to avoid SSR issues with react-pdf
+const DocumentViewer = dynamic(
+  () => import("@/components/workspace/DocumentViewer").then(mod => ({ default: mod.DocumentViewer })),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+);
 
 export default function ProjectWorkspace() {
   const router = useRouter();
