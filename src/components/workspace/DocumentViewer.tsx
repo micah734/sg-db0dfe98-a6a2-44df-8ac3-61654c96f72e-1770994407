@@ -213,7 +213,11 @@ export function DocumentViewer({
                     onAnnotationClick={onAnnotationSelect}
                   />
                 )}
-                {!pageDimensions && console.log("Waiting for page dimensions...")}
+                {!pageDimensions && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/50 z-20">
+                    <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                  </div>
+                )}
               </div>
             </PDFDocument>
           </div>

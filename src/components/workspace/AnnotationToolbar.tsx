@@ -29,6 +29,8 @@ interface AnnotationToolbarProps {
   onUnlinkTimestamp?: () => void;
   onDeleteAnnotation?: () => void;
   hasLinkedTimestamp?: boolean;
+  hasSelectedAnnotation?: boolean;
+  isLinked?: boolean;
 }
 
 const PRESET_COLORS = [
