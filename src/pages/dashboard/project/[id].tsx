@@ -7,6 +7,7 @@ import { AnnotationToolbar } from "@/components/workspace/AnnotationToolbar";
 import { projectService } from "@/services/projectService";
 import { documentService, type Document } from "@/services/documentService";
 import { mediaService, type MediaFile } from "@/services/mediaService";
+import { annotationService, type Annotation } from "@/services/annotationService";
 import { 
   ResizableHandle, 
   ResizablePanel, 
@@ -62,6 +63,11 @@ export default function ProjectWorkspace() {
   const [uploadType, setUploadType] = useState<"document" | "media">("document");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Annotation State
+  const [currentTool, setCurrentTool] = useState<"highlight" | "drawing" | "text" | "shape" | "select">("select");
+  const [currentColor, setCurrentColor] = useState("#FFFF00");
+  const [selectedAnnotation, setSelectedAnnotation] = useState<Annotation | null>(null);
 
   useEffect(() => {
     if (id && typeof id === "string") {
@@ -165,6 +171,47 @@ export default function ProjectWorkspace() {
     } catch (error) {
       console.error("Error deleting document:", error);
       alert("Failed to delete document.");
+    }
+  };
+
+  const handleLinkTimestamp = async () => {
+    if (!selectedAnnotation || !selectedMedia) return;
+    
+    // Get current timestamp from media player (this would need to be exposed via context or ref)
+    // For now, we'll use a placeholder or need to implement a media context
+    const timestamp = 0; // TODO: Get actual timestamp
+    
+    try {
+      await annotationService.linkToTimestamp(selectedAnnotation.id, selectedMedia.id, timestamp);
+      // Refresh annotation to show link status
+      setSelectedAnnotation(prev => prev ? { ...prev, media_file_id: selectedMedia.id, media_timestamp: timestamp } : null);
+    } catch (error) {
+      console.error("Error linking timestamp:", error);
+    }
+  };
+
+  const handleUnlinkTimestamp = async () => {
+    if (!selectedAnnotation) return;
+    
+    try {
+      await annotationService.unlinkFromTimestamp(selectedAnnotation.id);
+      setSelectedAnnotation(prev => prev ? { ...prev, media_file_id: null, media_timestamp: null } : null);
+    } catch (error) {
+      console.error("Error unlinking timestamp:", error);
+    }
+  };
+
+  const handleDeleteAnnotation = async () => {
+    if (!selectedAnnotation) return;
+    
+    if (confirm("Delete this annotation?")) {
+      try {
+        await annotationService.deleteAnnotation(selectedAnnotation.id);
+        setSelectedAnnotation(null);
+        // DocumentViewer will need to reload annotations
+      } catch (error) {
+        console.error("Error deleting annotation:", error);
+      }
     }
   };
 
@@ -368,13 +415,26 @@ export default function ProjectWorkspace() {
           {/* Center - Document Viewer */}
           <ResizablePanel defaultSize={55} minSize={40}>
             <div className="h-full flex flex-col">
-              <AnnotationToolbar />
+              <AnnotationToolbar 
+                currentTool={currentTool}
+                onToolChange={setCurrentTool}
+                currentColor={currentColor}
+                onColorChange={setCurrentColor}
+                hasSelectedAnnotation={!!selectedAnnotation}
+                isLinked={!!selectedAnnotation?.media_timestamp}
+                onLinkTimestamp={handleLinkTimestamp}
+                onUnlinkTimestamp={handleUnlinkTimestamp}
+                onDeleteAnnotation={handleDeleteAnnotation}
+              />
               <DocumentViewer 
                 document={selectedDocument}
                 documentUrl={selectedDocument ? documentService.getDocumentUrl(selectedDocument.storage_path) : undefined}
                 onAnnotationCreate={(annotation) => {
                   console.log("Annotation created:", annotation);
                 }}
+                currentTool={currentTool}
+                currentColor={currentColor}
+                onAnnotationSelect={setSelectedAnnotation}
               />
             </div>
           </ResizablePanel>

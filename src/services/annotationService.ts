@@ -110,6 +110,7 @@ export const annotationService = {
       .from("annotations")
       .insert({
         ...annotationData,
+        coordinates: annotationData.coordinates as unknown as any,
         user_id: session.session.user.id,
       })
       .select()
@@ -134,6 +135,7 @@ export const annotationService = {
       .from("annotations")
       .update({
         ...updates,
+        coordinates: updates.coordinates as unknown as any,
         updated_at: new Date().toISOString(),
       })
       .eq("id", annotationId)

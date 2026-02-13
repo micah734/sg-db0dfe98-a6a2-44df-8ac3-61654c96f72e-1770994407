@@ -6,6 +6,7 @@ interface AnnotationCanvasProps {
   pageNumber: number;
   width: number;
   height: number;
+  scale?: number;
   currentTool: "highlight" | "drawing" | "text" | "shape" | "select";
   currentColor: string;
   onAnnotationClick?: (annotation: Annotation) => void;
@@ -18,6 +19,7 @@ export function AnnotationCanvas({
   pageNumber,
   width,
   height,
+  scale = 1,
   currentTool,
   currentColor,
   onAnnotationClick,
@@ -38,7 +40,7 @@ export function AnnotationCanvas({
   // Redraw canvas when annotations or dimensions change
   useEffect(() => {
     drawAnnotations();
-  }, [annotations, width, height]);
+  }, [annotations, width, height, scale]);
 
   const loadAnnotations = async () => {
     try {
@@ -61,42 +63,49 @@ export function AnnotationCanvas({
 
     // Draw all annotations
     annotations.forEach((annotation) => {
-      const coords = annotation.coordinates as AnnotationCoordinates;
+      const coords = annotation.coordinates as unknown as AnnotationCoordinates;
       ctx.strokeStyle = annotation.color || "#FFFF00";
       ctx.fillStyle = annotation.color || "#FFFF00";
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2 * scale; // Scale line width
+
+      // Scale coordinates
+      const s = (val: number) => val * scale;
+      const sx = s(coords.x);
+      const sy = s(coords.y);
+      const sw = s(coords.width || 0);
+      const sh = s(coords.height || 0);
 
       switch (annotation.annotation_type) {
         case "highlight":
           ctx.globalAlpha = 0.3;
-          ctx.fillRect(coords.x, coords.y, coords.width || 0, coords.height || 0);
+          ctx.fillRect(sx, sy, sw, sh);
           ctx.globalAlpha = 1.0;
           break;
 
         case "drawing":
           if (coords.points && coords.points.length > 1) {
             ctx.beginPath();
-            ctx.moveTo(coords.points[0].x, coords.points[0].y);
+            ctx.moveTo(s(coords.points[0].x), s(coords.points[0].y));
             coords.points.forEach((point) => {
-              ctx.lineTo(point.x, point.y);
+              ctx.lineTo(s(point.x), s(point.y));
             });
             ctx.stroke();
           }
           break;
 
         case "shape":
-          ctx.strokeRect(coords.x, coords.y, coords.width || 0, coords.height || 0);
+          ctx.strokeRect(sx, sy, sw, sh);
           break;
 
         case "text":
-          ctx.font = "16px Arial";
-          ctx.fillText(annotation.content || "", coords.x, coords.y);
+          ctx.font = `${16 * scale}px Arial`;
+          ctx.fillText(annotation.content || "", sx, sy);
           
           // Draw timestamp indicator if linked
           if (annotation.media_timestamp !== null) {
             ctx.fillStyle = "#FF0000";
             ctx.beginPath();
-            ctx.arc(coords.x - 10, coords.y - 10, 5, 0, Math.PI * 2);
+            ctx.arc(sx - (10 * scale), sy - (10 * scale), 5 * scale, 0, Math.PI * 2);
             ctx.fill();
           }
           break;
@@ -145,7 +154,7 @@ export function AnnotationCanvas({
     drawAnnotations(); // Redraw existing
     ctx.strokeStyle = currentColor;
     ctx.fillStyle = currentColor;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2 * scale;
 
     switch (currentTool) {
       case "highlight":
@@ -182,36 +191,39 @@ export function AnnotationCanvas({
     const coords = getCanvasCoordinates(e);
     setIsDrawing(false);
 
-    let annotationCoords: AnnotationCoordinates = { x: startPoint.x, y: startPoint.y };
+    // Helper to unscale coordinates for storage
+    const u = (val: number) => val / scale;
+
+    let annotationCoords: AnnotationCoordinates = { x: u(startPoint.x), y: u(startPoint.y) };
     let annotationType: "highlight" | "drawing" | "text" | "shape" = "drawing";
 
     switch (currentTool) {
       case "highlight":
         annotationType = "highlight";
         annotationCoords = {
-          x: startPoint.x,
-          y: startPoint.y,
-          width: coords.x - startPoint.x,
-          height: coords.y - startPoint.y,
+          x: u(startPoint.x),
+          y: u(startPoint.y),
+          width: u(coords.x - startPoint.x),
+          height: u(coords.y - startPoint.y),
         };
         break;
 
       case "shape":
         annotationType = "shape";
         annotationCoords = {
-          x: startPoint.x,
-          y: startPoint.y,
-          width: coords.x - startPoint.x,
-          height: coords.y - startPoint.y,
+          x: u(startPoint.x),
+          y: u(startPoint.y),
+          width: u(coords.x - startPoint.x),
+          height: u(coords.y - startPoint.y),
         };
         break;
 
       case "drawing":
         annotationType = "drawing";
         annotationCoords = {
-          x: startPoint.x,
-          y: startPoint.y,
-          points: [...currentPath, coords],
+          x: u(startPoint.x),
+          y: u(startPoint.y),
+          points: [...currentPath, coords].map(p => ({ x: u(p.x), y: u(p.y) })),
         };
         setCurrentPath([]);
         break;
@@ -220,7 +232,7 @@ export function AnnotationCanvas({
         annotationType = "text";
         const textContent = prompt("Enter text:");
         if (!textContent) return;
-        annotationCoords = { x: coords.x, y: coords.y };
+        annotationCoords = { x: u(coords.x), y: u(coords.y) };
         
         try {
           await annotationService.createAnnotation({
@@ -261,30 +273,33 @@ export function AnnotationCanvas({
 
   const handleAnnotationClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const coords = getCanvasCoordinates(e);
+    const u = (val: number) => val / scale;
+    const clickX = u(coords.x);
+    const clickY = u(coords.y);
     
     // Find clicked annotation
     const clickedAnnotation = annotations.find((ann) => {
-      const c = ann.coordinates as AnnotationCoordinates;
+      const c = ann.coordinates as unknown as AnnotationCoordinates;
       
       switch (ann.annotation_type) {
         case "highlight":
         case "shape":
           return (
-            coords.x >= c.x &&
-            coords.x <= c.x + (c.width || 0) &&
-            coords.y >= c.y &&
-            coords.y <= c.y + (c.height || 0)
+            clickX >= c.x &&
+            clickX <= c.x + (c.width || 0) &&
+            clickY >= c.y &&
+            clickY <= c.y + (c.height || 0)
           );
         
         case "text":
-          // 20px radius around text
-          return Math.hypot(coords.x - c.x, coords.y - c.y) < 20;
+          // 20px radius around text (unscaled)
+          return Math.hypot(clickX - c.x, clickY - c.y) < 20;
         
         case "drawing":
           // Check if click is near any point in the path
           if (c.points) {
             return c.points.some(
-              (point) => Math.hypot(coords.x - point.x, coords.y - point.y) < 10
+              (point) => Math.hypot(clickX - point.x, clickY - point.y) < 10
             );
           }
           return false;

@@ -1,27 +1,39 @@
 import { useState, useRef, useEffect } from "react";
 import { Document as PDFDocument, Page as PDFPage, pdfjs } from "react-pdf";
 import { Document, type Document as DocumentType } from "@/services/documentService";
+import { Annotation } from "@/services/annotationService";
+import { AnnotationCanvas } from "@/components/workspace/AnnotationCanvas";
 import { FileText, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-// Configure PDF.js worker with more reliable CDN
+// Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 interface DocumentViewerProps {
   document: DocumentType | null;
   documentUrl?: string;
   onAnnotationCreate?: (annotation: any) => void;
+  currentTool: "highlight" | "drawing" | "text" | "shape" | "select";
+  currentColor: string;
+  onAnnotationSelect?: (annotation: Annotation) => void;
 }
 
-export function DocumentViewer({ document, documentUrl, onAnnotationCreate }: DocumentViewerProps) {
+export function DocumentViewer({ 
+  document, 
+  documentUrl, 
+  onAnnotationCreate,
+  currentTool,
+  currentColor,
+  onAnnotationSelect
+}: DocumentViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [scale, setScale] = useState<number>(1.0);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pageDimensions, setPageDimensions] = useState<{ width: number; height: number } | null>(null);
   
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Load PDF URL when document changes
@@ -46,6 +58,15 @@ export function DocumentViewer({ document, documentUrl, onAnnotationCreate }: Do
     console.error("Error loading PDF:", error);
     setError("Failed to load PDF. Please try again.");
     setLoading(false);
+  };
+
+  const onPageLoadSuccess = (page: any) => {
+    // Get viewport at current scale
+    const viewport = page.getViewport({ scale });
+    setPageDimensions({
+      width: viewport.width,
+      height: viewport.height
+    });
   };
 
   const changePage = (offset: number) => {
@@ -142,7 +163,7 @@ export function DocumentViewer({ document, documentUrl, onAnnotationCreate }: Do
 
       {/* PDF Viewer */}
       <div className="flex-1 overflow-auto bg-slate-100 p-4">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-5xl mx-auto flex justify-center">
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4 text-red-800">
               <p className="font-medium">Error loading document</p>
@@ -157,53 +178,43 @@ export function DocumentViewer({ document, documentUrl, onAnnotationCreate }: Do
             </div>
           )}
 
-          <div className="relative">
+          <div className="relative shadow-lg rounded-lg overflow-hidden bg-white">
             <PDFDocument
               file={pdfUrl}
               onLoadSuccess={onDocumentLoadSuccess}
               onLoadError={onDocumentLoadError}
               loading={
-                <div className="flex items-center justify-center py-12">
+                <div className="flex items-center justify-center py-12 w-[600px] h-[800px]">
                   <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
                 </div>
               }
             >
-              <PDFPage
-                pageNumber={pageNumber}
-                scale={scale}
-                className="shadow-lg rounded-lg overflow-hidden"
-                renderTextLayer={true}
-                renderAnnotationLayer={true}
-              />
-            </PDFDocument>
-
-            {/* Canvas overlay for annotations */}
-            <canvas
-              ref={canvasRef}
-              className="absolute top-0 left-0 pointer-events-none"
-              style={{
-                transform: `scale(${scale})`,
-                transformOrigin: "top left"
-              }}
-            />
-          </div>
-
-          {/* Document Info */}
-          {!loading && !error && (
-            <div className="mt-4 bg-white border border-slate-200 rounded-lg p-4">
-              <div className="flex items-center justify-between text-sm">
-                <div>
-                  <span className="font-medium text-slate-900">{document.name}</span>
-                  <span className="text-slate-500 ml-2">
-                    • {document.file_type.toUpperCase()}
-                  </span>
-                </div>
-                <div className="text-slate-500">
-                  Uploaded {new Date(document.created_at || "").toLocaleDateString()}
-                </div>
+              <div className="relative">
+                <PDFPage
+                  pageNumber={pageNumber}
+                  scale={scale}
+                  className="block"
+                  renderTextLayer={true}
+                  renderAnnotationLayer={true}
+                  onLoadSuccess={onPageLoadSuccess}
+                />
+                
+                {/* Annotation Canvas Overlay */}
+                {pageDimensions && (
+                  <AnnotationCanvas
+                    documentId={document.id}
+                    pageNumber={pageNumber}
+                    width={pageDimensions.width}
+                    height={pageDimensions.height}
+                    scale={scale}
+                    currentTool={currentTool}
+                    currentColor={currentColor}
+                    onAnnotationClick={onAnnotationSelect}
+                  />
+                )}
               </div>
-            </div>
-          )}
+            </PDFDocument>
+          </div>
         </div>
       </div>
     </div>
