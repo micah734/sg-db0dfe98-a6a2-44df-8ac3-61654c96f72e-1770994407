@@ -44,7 +44,7 @@ export const mediaService = {
     projectId: string,
     file: File,
     folderId?: string,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number, stage?: string) => void
   ): Promise<MediaFile> {
     const { data: { user } } = await supabase.auth.getUser();
     
@@ -59,11 +59,14 @@ export const mediaService = {
     
     let uploadError;
 
-    // For files larger than 50MB, split into chunks
+    // For files larger than 50MB, use chunked upload with client-side merging
     if (file.size > 50 * 1024 * 1024) {
       const chunks = Math.ceil(file.size / CHUNK_SIZE);
-      const uploadedParts: string[] = [];
+      const uploadedChunkPaths: string[] = [];
 
+      // Step 1: Upload all chunks
+      if (onProgress) onProgress(0, "Uploading chunks...");
+      
       for (let i = 0; i < chunks; i++) {
         const start = i * CHUNK_SIZE;
         const end = Math.min(start + CHUNK_SIZE, file.size);
@@ -83,7 +86,7 @@ export const mediaService = {
             .upload(chunkFileName, chunkBlob, {
               cacheControl: "3600",
               upsert: false,
-              contentType: file.type // Explicitly set content type
+              contentType: file.type
             });
 
           if (!error) {
@@ -105,43 +108,92 @@ export const mediaService = {
           break;
         }
 
-        uploadedParts.push(chunkFileName);
+        uploadedChunkPaths.push(chunkFileName);
         
         if (onProgress) {
-          const progress = Math.round(((i + 1) / chunks) * 100);
-          onProgress(progress);
+          const progress = Math.round(((i + 1) / chunks) * 50); // First 50% for upload
+          onProgress(progress, "Uploading chunks...");
         }
       }
 
-      if (!uploadError && uploadedParts.length > 0) {
-        console.log(`Large file uploaded in ${uploadedParts.length} chunks. Merging...`);
+      if (!uploadError && uploadedChunkPaths.length > 0) {
+        console.log(`Uploaded ${uploadedChunkPaths.length} chunks. Starting client-side merge...`);
         
-        // Invoke Edge Function to merge chunks
         try {
-          const { data: mergeData, error: mergeError } = await supabase.functions.invoke('merge-media-chunks', {
-            body: {
-              userId: user.id,
-              projectId,
-              fileName,
-              totalChunks: chunks,
-              mimeType: file.type,
-              fileSize: file.size
+          // Step 2: Download and merge chunks client-side
+          if (onProgress) onProgress(50, "Merging chunks...");
+          
+          const chunkBlobs: Blob[] = [];
+          
+          for (let i = 0; i < uploadedChunkPaths.length; i++) {
+            const chunkPath = uploadedChunkPaths[i];
+            
+            // Download chunk
+            const { data: chunkData, error: downloadError } = await supabase.storage
+              .from("media")
+              .download(chunkPath);
+            
+            if (downloadError) {
+              console.error(`Error downloading chunk ${i}:`, downloadError);
+              throw new Error(`Failed to download chunk ${i}: ${downloadError.message}`);
             }
-          });
-
-          if (mergeError) {
-            console.error("Error merging chunks:", mergeError);
-            throw new Error(`Failed to merge chunks: ${mergeError.message}`);
+            
+            chunkBlobs.push(chunkData);
+            
+            if (onProgress) {
+              const progress = 50 + Math.round(((i + 1) / uploadedChunkPaths.length) * 25); // 50-75% for download
+              onProgress(progress, "Downloading chunks...");
+            }
           }
-
-          console.log("Chunks merged successfully:", mergeData);
+          
+          // Step 3: Merge blobs into single file
+          if (onProgress) onProgress(75, "Merging file...");
+          
+          const mergedBlob = new Blob(chunkBlobs, { type: file.type });
+          console.log(`Merged ${chunkBlobs.length} chunks into single file of ${mergedBlob.size} bytes`);
+          
+          // Step 4: Upload merged file
+          if (onProgress) onProgress(80, "Uploading merged file...");
+          
+          const { error: mergedUploadError } = await supabase.storage
+            .from("media")
+            .upload(fileNameWithPath, mergedBlob, {
+              cacheControl: "3600",
+              upsert: true,
+              contentType: file.type
+            });
+          
+          if (mergedUploadError) {
+            console.error("Error uploading merged file:", mergedUploadError);
+            throw new Error(`Failed to upload merged file: ${mergedUploadError.message}`);
+          }
+          
+          console.log("Merged file uploaded successfully");
+          
+          // Step 5: Clean up chunk files
+          if (onProgress) onProgress(90, "Cleaning up...");
+          
+          const { error: deleteError } = await supabase.storage
+            .from("media")
+            .remove(uploadedChunkPaths);
+          
+          if (deleteError) {
+            console.warn("Error cleaning up chunks (non-fatal):", deleteError);
+          } else {
+            console.log("Chunk cleanup completed");
+          }
+          
+          if (onProgress) onProgress(95, "Finalizing...");
+          
         } catch (mergeErr) {
-          console.error("Merge operation failed:", mergeErr);
-          throw new Error(`Chunk merge failed: ${mergeErr instanceof Error ? mergeErr.message : 'Unknown error'}`);
+          console.error("Client-side merge failed:", mergeErr);
+          throw new Error(`Merge operation failed: ${mergeErr instanceof Error ? mergeErr.message : 'Unknown error'}`);
         }
       }
     } else {
       // Standard upload for smaller files with retry logic
+      if (onProgress) onProgress(0, "Uploading...");
+      
       let retries = 0;
       
       while (retries < MAX_RETRIES) {
@@ -167,7 +219,7 @@ export const mediaService = {
       }
       
       if (onProgress) {
-        onProgress(100);
+        onProgress(95, "Finalizing...");
       }
     }
 
@@ -194,6 +246,10 @@ export const mediaService = {
     if (error) {
       console.error("Error creating media file record:", error);
       throw error;
+    }
+
+    if (onProgress) {
+      onProgress(100, "Complete!");
     }
 
     return data;
