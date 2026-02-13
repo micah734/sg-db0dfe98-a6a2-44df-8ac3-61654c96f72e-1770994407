@@ -6,6 +6,8 @@ export type Transcript = Tables<"transcripts">;
 
 // Chunk size for uploads (5MB chunks)
 const CHUNK_SIZE = 5 * 1024 * 1024;
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000;
 
 export const mediaService = {
   async getMediaFiles(projectId: string): Promise<MediaFile[]> {
@@ -56,57 +58,88 @@ export const mediaService = {
     
     let uploadError;
 
-    // For files larger than 50MB, we need to use multipart upload
+    // For files larger than 50MB, split into chunks
     if (file.size > 50 * 1024 * 1024) {
-      // Split file into chunks and upload sequentially
       const chunks = Math.ceil(file.size / CHUNK_SIZE);
       const uploadedParts: string[] = [];
 
       for (let i = 0; i < chunks; i++) {
         const start = i * CHUNK_SIZE;
         const end = Math.min(start + CHUNK_SIZE, file.size);
-        const chunk = file.slice(start, end);
+        
+        // Create a proper Blob with the original MIME type
+        const chunkBlob = new Blob([file.slice(start, end)], { type: file.type });
         
         const chunkFileName = `${fileName}.part${i}`;
         
-        const { error: chunkError } = await supabase.storage
-          .from("media")
-          .upload(chunkFileName, chunk, {
-            cacheControl: "3600",
-            upsert: false
-          });
+        // Retry logic for chunk upload
+        let retries = 0;
+        let chunkError = null;
+
+        while (retries < MAX_RETRIES) {
+          const { error } = await supabase.storage
+            .from("media")
+            .upload(chunkFileName, chunkBlob, {
+              cacheControl: "3600",
+              upsert: false,
+              contentType: file.type // Explicitly set content type
+            });
+
+          if (!error) {
+            chunkError = null;
+            break;
+          }
+
+          chunkError = error;
+          retries++;
+          
+          if (retries < MAX_RETRIES) {
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * retries));
+          }
+        }
 
         if (chunkError) {
-          console.error(`Error uploading chunk ${i}:`, chunkError);
+          console.error(`Error uploading chunk ${i} after ${MAX_RETRIES} retries:`, chunkError);
           uploadError = chunkError;
           break;
         }
 
         uploadedParts.push(chunkFileName);
         
-        // Report progress
         if (onProgress) {
           const progress = Math.round(((i + 1) / chunks) * 100);
           onProgress(progress);
         }
       }
 
-      // If all chunks uploaded successfully, we need to inform the user
-      // Note: Supabase doesn't support automatic chunk merging, so we'll keep the last chunk as the final file
       if (!uploadError && uploadedParts.length > 0) {
-        // Use the first chunk as reference (in production, you'd merge these server-side)
-        console.warn("Large file uploaded in chunks. Consider implementing server-side merging.");
+        console.log(`Large file uploaded in ${uploadedParts.length} chunks. Files stored separately.`);
       }
     } else {
-      // Standard upload for files under 50MB
-      const { error } = await supabase.storage
-        .from("media")
-        .upload(fileName, file, {
-          cacheControl: "3600",
-          upsert: false
-        });
+      // Standard upload for smaller files with retry logic
+      let retries = 0;
       
-      uploadError = error;
+      while (retries < MAX_RETRIES) {
+        const { error } = await supabase.storage
+          .from("media")
+          .upload(fileName, file, {
+            cacheControl: "3600",
+            upsert: false,
+            contentType: file.type
+          });
+        
+        if (!error) {
+          uploadError = null;
+          break;
+        }
+
+        uploadError = error;
+        retries++;
+        
+        if (retries < MAX_RETRIES) {
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * retries));
+        }
+      }
       
       if (onProgress) {
         onProgress(100);
