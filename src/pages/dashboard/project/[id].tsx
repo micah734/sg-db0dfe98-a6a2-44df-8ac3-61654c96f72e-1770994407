@@ -96,6 +96,15 @@ export default function ProjectWorkspace() {
     const file = event.target.files?.[0];
     if (!file || !id) return;
 
+    // File size validation
+    const maxSize = uploadType === "document" ? 100 * 1024 * 1024 : 500 * 1024 * 1024; // 100MB for docs, 500MB for media
+    if (file.size > maxSize) {
+      const maxSizeMB = uploadType === "document" ? 100 : 500;
+      alert(`File size exceeds the maximum allowed size of ${maxSizeMB}MB. Please choose a smaller file.`);
+      event.target.value = ""; // Reset input
+      return;
+    }
+
     try {
       setUploading(true);
       setUploadProgress(0);
@@ -121,9 +130,23 @@ export default function ProjectWorkspace() {
 
       setUploadDialogOpen(false);
       setUploadProgress(100);
-    } catch (error) {
+      alert("File uploaded successfully!");
+    } catch (error: any) {
       console.error("Error uploading file:", error);
-      alert("Failed to upload file. Please try again.");
+      
+      // Better error messages
+      let errorMessage = "Failed to upload file. Please try again.";
+      
+      if (error.message?.includes("exceeded") || error.message?.includes("size")) {
+        errorMessage = "File size exceeds storage limits. Try a smaller file or compress the video.";
+      } else if (error.message?.includes("network") || error.message?.includes("fetch")) {
+        errorMessage = "Network error. Please check your connection and try again.";
+      } else if (error.message?.includes("quota")) {
+        errorMessage = "Storage quota exceeded. Please free up space or upgrade your plan.";
+      }
+      
+      alert(errorMessage);
+      event.target.value = ""; // Reset input
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -394,6 +417,9 @@ export default function ProjectWorkspace() {
                   onChange={handleFileUpload}
                   disabled={uploading}
                 />
+                <p className="text-xs text-slate-500">
+                  Maximum file size: {uploadType === "document" ? "100MB" : "500MB"}
+                </p>
               </div>
 
               {uploading && (
