@@ -442,8 +442,13 @@ export default function ProjectWorkspace() {
           <ResizableHandle withHandle />
 
           {/* Right Panel - Media */}
-          <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
-            <MediaPanel media={selectedMedia} />
+          <ResizablePanel defaultSize={30} minSize={20}>
+            <div className="h-full border-l">
+              <MediaPanel 
+                media={selectedMedia} 
+                projectId={project.id}
+              />
+            </div>
           </ResizablePanel>
         </ResizablePanelGroup>
 

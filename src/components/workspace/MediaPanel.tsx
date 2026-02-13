@@ -4,12 +4,14 @@ import { Play, Pause, Volume2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TranscriptView } from "@/components/workspace/TranscriptView";
 
 interface MediaPanelProps {
   media: MediaFile | null;
+  projectId: string;
 }
 
-export function MediaPanel({ media }: MediaPanelProps) {
+export function MediaPanel({ media, projectId }: MediaPanelProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -23,7 +25,6 @@ export function MediaPanel({ media }: MediaPanelProps) {
   useEffect(() => {
     if (media) {
       loadMedia(media);
-      loadTranscript(media.id);
     } else {
       cleanupBlobUrl();
       setMediaUrl(null);
@@ -33,6 +34,13 @@ export function MediaPanel({ media }: MediaPanelProps) {
     return () => {
       cleanupBlobUrl();
     };
+  }, [media]);
+
+  // Load transcript when media file changes
+  useEffect(() => {
+    if (media) {
+      // Transcript is now handled by TranscriptView component
+    }
   }, [media]);
 
   function cleanupBlobUrl() {
@@ -79,16 +87,6 @@ export function MediaPanel({ media }: MediaPanelProps) {
     } finally {
       setIsLoadingMedia(false);
       setLoadingProgress(0);
-    }
-  }
-
-  async function loadTranscript(mediaId: string) {
-    try {
-      const transcriptData = await mediaService.getTranscript(mediaId);
-      setTranscriptText(transcriptData?.content || null);
-    } catch (error) {
-      console.error("Failed to load transcript", error);
-      setTranscriptText(null);
     }
   }
 
@@ -232,27 +230,19 @@ export function MediaPanel({ media }: MediaPanelProps) {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="transcript" className="flex-1 mt-0">
-          <ScrollArea className="h-full">
-            <div className="p-4 space-y-3">
-              {transcriptText ? (
-                <div className="text-sm text-slate-700 leading-relaxed">
-                  {transcriptText.split("\n").map((line, idx) => (
-                    <p key={idx} className="mb-2 hover:bg-indigo-50 p-2 rounded cursor-pointer transition-colors">
-                      {line}
-                    </p>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12 text-slate-400">
-                  <p className="text-sm">No transcript available</p>
-                  <Button variant="outline" size="sm" className="mt-4">
-                    Generate Transcript
-                  </Button>
-                </div>
-              )}
+        <TabsContent value="transcript" className="flex-1 min-h-0 m-0">
+          {media ? (
+            <TranscriptView 
+              mediaFileId={media.id}
+              projectId={projectId}
+              currentTime={currentTime}
+              onSeek={jumpToTime}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full text-muted-foreground p-8 text-center">
+              <p>Select a media file to view its transcript</p>
             </div>
-          </ScrollArea>
+          )}
         </TabsContent>
 
         <TabsContent value="notes" className="flex-1 mt-0">

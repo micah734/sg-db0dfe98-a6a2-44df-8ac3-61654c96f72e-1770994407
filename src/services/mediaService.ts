@@ -252,8 +252,9 @@ export const mediaService = {
       .from("transcripts")
       .insert({
         media_file_id: mediaFileId,
-        content,
-        segments: segments || null
+        full_text: "",
+        segments: [],
+        status: "pending",
       })
       .select()
       .single();

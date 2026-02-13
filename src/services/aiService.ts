@@ -1,94 +1,89 @@
-// AI Service for OpenAI integration
-// This service will be implemented with API routes to keep API keys secure
+import { supabase } from "@/integrations/supabase/client";
 
-export interface TranscriptionResult {
-  text: string;
-  segments?: Array<{
-    text: string;
-    start: number;
-    end: number;
-  }>;
-}
-
-export interface SummaryResult {
-  summary: string;
-}
-
-export interface SearchResult {
-  content: string;
-  score: number;
-  metadata: any;
-}
+/**
+ * AI Service - Handles all AI-related operations
+ * - Transcription (via API route)
+ * - Summarization (future)
+ * - Embeddings & Search (future)
+ * - Q&A (future)
+ */
 
 export const aiService = {
-  async transcribeMedia(mediaFileId: string): Promise<TranscriptionResult> {
-    const response = await fetch("/api/ai/transcribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mediaFileId })
-    });
+  /**
+   * Start transcription for a media file
+   */
+  transcribeMedia: async (
+    mediaFileId: string,
+    transcriptId: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const response = await fetch("/api/transcribe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          mediaFileId,
+          transcriptId,
+        }),
+      });
 
-    if (!response.ok) {
-      throw new Error("Failed to transcribe media");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Transcription failed");
+      }
+
+      const data = await response.json();
+      return { success: true };
+    } catch (error: any) {
+      console.error("Transcription error:", error);
+      return { success: false, error: error.message };
     }
-
-    return response.json();
   },
 
-  async generateSummary(content: string, type: "document" | "media" | "project"): Promise<SummaryResult> {
-    const response = await fetch("/api/ai/summarize", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content, type })
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to generate summary");
-    }
-
-    return response.json();
+  /**
+   * Generate summary for a document (future implementation)
+   */
+  summarizeDocument: async (documentId: string): Promise<string> => {
+    // TODO: Implement with OpenAI GPT
+    throw new Error("Not implemented yet");
   },
 
-  async semanticSearch(projectId: string, query: string): Promise<SearchResult[]> {
-    const response = await fetch("/api/ai/search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectId, query })
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to perform search");
-    }
-
-    return response.json();
+  /**
+   * Generate summary for a project (future implementation)
+   */
+  summarizeProject: async (projectId: string): Promise<string> => {
+    // TODO: Implement with OpenAI GPT
+    throw new Error("Not implemented yet");
   },
 
-  async askQuestion(projectId: string, question: string): Promise<{ answer: string; sources: any[] }> {
-    const response = await fetch("/api/ai/ask", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectId, question })
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to get answer");
-    }
-
-    return response.json();
+  /**
+   * Generate embeddings for semantic search (future implementation)
+   */
+  generateEmbeddings: async (text: string): Promise<number[]> => {
+    // TODO: Implement with OpenAI Embeddings API
+    throw new Error("Not implemented yet");
   },
 
-  async generateEmbedding(text: string): Promise<number[]> {
-    const response = await fetch("/api/ai/embed", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text })
-    });
+  /**
+   * Semantic search across project content (future implementation)
+   */
+  semanticSearch: async (
+    projectId: string,
+    query: string
+  ): Promise<any[]> => {
+    // TODO: Implement with vector database
+    throw new Error("Not implemented yet");
+  },
 
-    if (!response.ok) {
-      throw new Error("Failed to generate embedding");
-    }
-
-    const data = await response.json();
-    return data.embedding;
-  }
+  /**
+   * Ask a question about project content (future implementation)
+   */
+  askQuestion: async (
+    projectId: string,
+    question: string
+  ): Promise<string> => {
+    // TODO: Implement with RAG (Retrieval-Augmented Generation)
+    throw new Error("Not implemented yet");
+  },
 };
