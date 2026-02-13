@@ -19,14 +19,9 @@ export const transcriptService = {
         .from("transcripts")
         .select("*")
         .eq("media_file_id", mediaFileId)
-        .single();
+        .maybeSingle();
 
-      if (error) {
-        if (error.code === "PGRST116") {
-          return null; // No transcript found
-        }
-        throw error;
-      }
+      if (error) throw error;
 
       return data;
     } catch (error) {
