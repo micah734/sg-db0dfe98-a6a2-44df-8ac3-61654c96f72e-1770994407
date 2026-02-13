@@ -65,9 +65,9 @@ export default function ProjectWorkspace() {
   const [uploadProgress, setUploadProgress] = useState(0);
 
   // Annotation State
-  const [currentTool, setCurrentTool] = useState<"highlight" | "drawing" | "text" | "shape" | "select">("select");
-  const [currentColor, setCurrentColor] = useState("#FFFF00");
-  const [selectedAnnotation, setSelectedAnnotation] = useState<Annotation | null>(null);
+  const [currentTool, setCurrentTool] = useState<"highlight" | "drawing" | "text" | "shape" | "select" | "eraser">("select");
+  const [currentColor, setCurrentColor] = useState<string>("#FFFF00");
+  const [selectedAnnotation, setSelectedAnnotation] = useState<any>(null);
 
   useEffect(() => {
     if (id && typeof id === "string") {

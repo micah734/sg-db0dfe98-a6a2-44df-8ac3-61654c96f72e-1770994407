@@ -7,7 +7,7 @@ interface AnnotationCanvasProps {
   width: number;
   height: number;
   scale?: number;
-  currentTool: "highlight" | "drawing" | "text" | "shape" | "select";
+  currentTool: "highlight" | "drawing" | "text" | "shape" | "select" | "eraser";
   currentColor: string;
   onAnnotationClick?: (annotation: Annotation) => void;
   selectedMediaFileId?: string;
@@ -132,6 +132,11 @@ export function AnnotationCanvas({
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (currentTool === "select") {
       handleAnnotationClick(e);
+      return;
+    }
+
+    if (currentTool === "eraser") {
+      handleEraserClick(e);
       return;
     }
 
@@ -319,6 +324,56 @@ export function AnnotationCanvas({
     }
   };
 
+  const handleEraserClick = async (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const coords = getCanvasCoordinates(e);
+    const u = (val: number) => val / scale;
+    const clickX = u(coords.x);
+    const clickY = u(coords.y);
+    
+    // Find clicked annotation
+    const clickedAnnotation = annotations.find((ann) => {
+      const c = ann.coordinates as unknown as AnnotationCoordinates;
+      
+      switch (ann.annotation_type) {
+        case "highlight":
+        case "shape":
+          return (
+            clickX >= c.x &&
+            clickX <= c.x + (c.width || 0) &&
+            clickY >= c.y &&
+            clickY <= c.y + (c.height || 0)
+          );
+        
+        case "text":
+          // 20px radius around text (unscaled)
+          return Math.hypot(clickX - c.x, clickY - c.y) < 20;
+        
+        case "drawing":
+          // Check if click is near any point in the path
+          if (c.points) {
+            return c.points.some(
+              (point) => Math.hypot(clickX - point.x, clickY - point.y) < 10
+            );
+          }
+          return false;
+        
+        default:
+          return false;
+      }
+    });
+
+    // Delete the annotation immediately
+    if (clickedAnnotation) {
+      try {
+        await annotationService.deleteAnnotation(clickedAnnotation.id);
+        // Reload annotations to reflect deletion
+        await loadAnnotations();
+      } catch (error) {
+        console.error("Failed to delete annotation:", error);
+      }
+    }
+  };
+
   return (
     <canvas
       ref={canvasRef}
@@ -329,9 +384,10 @@ export function AnnotationCanvas({
       onMouseUp={handleMouseUp}
       className="absolute top-0 left-0 cursor-crosshair"
       style={{ 
-        pointerEvents: currentTool === "select" ? "auto" : "all",
+        pointerEvents: currentTool === "select" || currentTool === "eraser" ? "auto" : "all",
         zIndex: 10,
-        touchAction: "none"
+        touchAction: "none",
+        cursor: currentTool === "eraser" ? "not-allowed" : currentTool === "select" ? "pointer" : "crosshair"
       }}
     />
   );

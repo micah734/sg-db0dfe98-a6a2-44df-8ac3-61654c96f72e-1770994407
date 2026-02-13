@@ -13,7 +13,7 @@ interface DocumentViewerProps {
   document: DocumentType | null;
   documentUrl?: string;
   onAnnotationCreate?: (annotation: any) => void;
-  currentTool: "highlight" | "drawing" | "text" | "shape" | "select";
+  currentTool: "highlight" | "drawing" | "text" | "shape" | "select" | "eraser";
   currentColor: string;
   onAnnotationSelect?: (annotation: Annotation) => void;
 }

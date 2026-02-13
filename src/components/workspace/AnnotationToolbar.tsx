@@ -2,30 +2,33 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
   Highlighter,
-  Pencil,
+  Pen,
   Type,
   Square,
   MousePointer,
+  Palette,
   Link,
   Unlink,
   Trash2,
+  Eraser,
 } from "lucide-react";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
 
 interface AnnotationToolbarProps {
-  currentTool: "highlight" | "drawing" | "text" | "shape" | "select";
-  onToolChange: (tool: "highlight" | "drawing" | "text" | "shape" | "select") => void;
+  currentTool: "highlight" | "drawing" | "text" | "shape" | "select" | "eraser";
+  onToolChange: (tool: "highlight" | "drawing" | "text" | "shape" | "select" | "eraser") => void;
   currentColor: string;
   onColorChange: (color: string) => void;
+  selectedAnnotation?: any;
   onLinkTimestamp?: () => void;
   onUnlinkTimestamp?: () => void;
   onDeleteAnnotation?: () => void;
-  hasSelectedAnnotation?: boolean;
-  isLinked?: boolean;
+  hasLinkedTimestamp?: boolean;
 }
 
 const PRESET_COLORS = [
@@ -55,14 +58,25 @@ export function AnnotationToolbar({
       {/* Drawing Tools */}
       <div className="flex items-center gap-1">
         <Button
-          variant={currentTool === "select" ? "default" : "ghost"}
-          size="icon"
+          variant={currentTool === "select" ? "default" : "outline"}
+          size="sm"
           onClick={() => onToolChange("select")}
           title="Select"
         >
           <MousePointer className="h-4 w-4" />
         </Button>
-        
+
+        <Button
+          variant={currentTool === "eraser" ? "default" : "outline"}
+          size="sm"
+          onClick={() => onToolChange("eraser")}
+          title="Eraser - Click annotations to delete"
+        >
+          <Eraser className="h-4 w-4" />
+        </Button>
+
+        <Separator orientation="vertical" className="h-8" />
+
         <Button
           variant={currentTool === "highlight" ? "default" : "ghost"}
           size="icon"
@@ -78,7 +92,7 @@ export function AnnotationToolbar({
           onClick={() => onToolChange("drawing")}
           title="Freehand Draw"
         >
-          <Pencil className="h-4 w-4" />
+          <Pen className="h-4 w-4" />
         </Button>
         
         <Button
