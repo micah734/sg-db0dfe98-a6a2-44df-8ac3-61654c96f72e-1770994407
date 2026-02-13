@@ -348,6 +348,7 @@ export default function ProjectWorkspace() {
               <AnnotationToolbar />
               <DocumentViewer 
                 document={selectedDocument}
+                documentUrl={selectedDocument ? documentService.getDocumentUrl(selectedDocument.storage_path) : undefined}
                 onAnnotationCreate={(annotation) => {
                   console.log("Annotation created:", annotation);
                 }}

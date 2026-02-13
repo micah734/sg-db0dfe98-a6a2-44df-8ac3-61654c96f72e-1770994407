@@ -9,10 +9,11 @@ pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@$
 
 interface DocumentViewerProps {
   document: DocumentType | null;
+  documentUrl?: string;
   onAnnotationCreate?: (annotation: any) => void;
 }
 
-export function DocumentViewer({ document, onAnnotationCreate }: DocumentViewerProps) {
+export function DocumentViewer({ document, documentUrl, onAnnotationCreate }: DocumentViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [scale, setScale] = useState<number>(1.0);
@@ -25,15 +26,15 @@ export function DocumentViewer({ document, onAnnotationCreate }: DocumentViewerP
 
   // Load PDF URL when document changes
   useEffect(() => {
-    if (document) {
+    if (document && documentUrl) {
       setLoading(true);
       setError(null);
-      setPdfUrl(document.storage_path);
+      setPdfUrl(documentUrl);
       setPageNumber(1);
     } else {
       setPdfUrl(null);
     }
-  }, [document]);
+  }, [document, documentUrl]);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);

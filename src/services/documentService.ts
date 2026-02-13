@@ -5,6 +5,13 @@ export type Document = Tables<"documents">;
 export type Annotation = Tables<"annotations">;
 
 export const documentService = {
+  getDocumentUrl(storagePath: string): string {
+    const { data } = supabase.storage
+      .from("documents")
+      .getPublicUrl(storagePath);
+    return data.publicUrl;
+  },
+
   async getDocuments(projectId: string): Promise<Document[]> {
     const { data, error } = await supabase
       .from("documents")
