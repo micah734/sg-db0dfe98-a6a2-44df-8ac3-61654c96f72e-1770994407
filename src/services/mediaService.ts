@@ -54,7 +54,8 @@ export const mediaService = {
     const fileType = file.type.startsWith("audio/") ? "audio" : "video";
     
     // Upload file to Supabase Storage
-    const fileName = `${user.id}/${projectId}/${Date.now()}_${file.name}`;
+    const fileName = `${Date.now()}_${file.name}`;
+    const fileNameWithPath = `${user.id}/${projectId}/${fileName}`;
     
     let uploadError;
 
@@ -70,7 +71,7 @@ export const mediaService = {
         // Create a proper Blob with the original MIME type
         const chunkBlob = new Blob([file.slice(start, end)], { type: file.type });
         
-        const chunkFileName = `${fileName}.part${i}`;
+        const chunkFileName = `${fileNameWithPath}.part${i}`;
         
         // Retry logic for chunk upload
         let retries = 0;
@@ -119,9 +120,12 @@ export const mediaService = {
         try {
           const { data: mergeData, error: mergeError } = await supabase.functions.invoke('merge-media-chunks', {
             body: {
+              userId: user.id,
+              projectId,
               fileName,
               totalChunks: chunks,
-              mimeType: file.type
+              mimeType: file.type,
+              fileSize: file.size
             }
           });
 
@@ -143,7 +147,7 @@ export const mediaService = {
       while (retries < MAX_RETRIES) {
         const { error } = await supabase.storage
           .from("media")
-          .upload(fileName, file, {
+          .upload(fileNameWithPath, file, {
             cacheControl: "3600",
             upsert: false,
             contentType: file.type
@@ -179,9 +183,9 @@ export const mediaService = {
         project_id: projectId,
         folder_id: folderId,
         user_id: user.id,
-        name: file.name,
+        file_name: file.name,
         file_type: fileType,
-        storage_path: fileName,
+        storage_path: fileNameWithPath,
         file_size: file.size
       })
       .select()
