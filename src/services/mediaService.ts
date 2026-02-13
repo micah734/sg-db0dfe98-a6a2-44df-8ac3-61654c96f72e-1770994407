@@ -58,13 +58,18 @@ export const mediaService = {
     const fileNameWithPath = `${user.id}/${projectId}/${fileName}`;
     
     let uploadError;
+    let isChunked = false;
+    let totalChunks = 0;
+    let chunkPattern = "";
 
-    // For files larger than 50MB, use chunked upload with client-side merging
+    // For files larger than 50MB, use chunked upload (no merge)
     if (file.size > 50 * 1024 * 1024) {
       const chunks = Math.ceil(file.size / CHUNK_SIZE);
-      const uploadedChunkPaths: string[] = [];
+      totalChunks = chunks;
+      chunkPattern = `${fileNameWithPath}.part`;
+      isChunked = true;
 
-      // Step 1: Upload all chunks
+      // Upload all chunks
       if (onProgress) onProgress(0, "Uploading chunks...");
       
       for (let i = 0; i < chunks; i++) {
@@ -107,88 +112,15 @@ export const mediaService = {
           uploadError = chunkError;
           break;
         }
-
-        uploadedChunkPaths.push(chunkFileName);
         
         if (onProgress) {
-          const progress = Math.round(((i + 1) / chunks) * 50); // First 50% for upload
-          onProgress(progress, "Uploading chunks...");
+          const progress = Math.round(((i + 1) / chunks) * 90); // 0-90% for upload
+          onProgress(progress, `Uploading chunk ${i + 1}/${chunks}...`);
         }
       }
 
-      if (!uploadError && uploadedChunkPaths.length > 0) {
-        console.log(`Uploaded ${uploadedChunkPaths.length} chunks. Starting client-side merge...`);
-        
-        try {
-          // Step 2: Download and merge chunks client-side
-          if (onProgress) onProgress(50, "Merging chunks...");
-          
-          const chunkBlobs: Blob[] = [];
-          
-          for (let i = 0; i < uploadedChunkPaths.length; i++) {
-            const chunkPath = uploadedChunkPaths[i];
-            
-            // Download chunk
-            const { data: chunkData, error: downloadError } = await supabase.storage
-              .from("media")
-              .download(chunkPath);
-            
-            if (downloadError) {
-              console.error(`Error downloading chunk ${i}:`, downloadError);
-              throw new Error(`Failed to download chunk ${i}: ${downloadError.message}`);
-            }
-            
-            chunkBlobs.push(chunkData);
-            
-            if (onProgress) {
-              const progress = 50 + Math.round(((i + 1) / uploadedChunkPaths.length) * 25); // 50-75% for download
-              onProgress(progress, "Downloading chunks...");
-            }
-          }
-          
-          // Step 3: Merge blobs into single file
-          if (onProgress) onProgress(75, "Merging file...");
-          
-          const mergedBlob = new Blob(chunkBlobs, { type: file.type });
-          console.log(`Merged ${chunkBlobs.length} chunks into single file of ${mergedBlob.size} bytes`);
-          
-          // Step 4: Upload merged file
-          if (onProgress) onProgress(80, "Uploading merged file...");
-          
-          const { error: mergedUploadError } = await supabase.storage
-            .from("media")
-            .upload(fileNameWithPath, mergedBlob, {
-              cacheControl: "3600",
-              upsert: true,
-              contentType: file.type
-            });
-          
-          if (mergedUploadError) {
-            console.error("Error uploading merged file:", mergedUploadError);
-            throw new Error(`Failed to upload merged file: ${mergedUploadError.message}`);
-          }
-          
-          console.log("Merged file uploaded successfully");
-          
-          // Step 5: Clean up chunk files
-          if (onProgress) onProgress(90, "Cleaning up...");
-          
-          const { error: deleteError } = await supabase.storage
-            .from("media")
-            .remove(uploadedChunkPaths);
-          
-          if (deleteError) {
-            console.warn("Error cleaning up chunks (non-fatal):", deleteError);
-          } else {
-            console.log("Chunk cleanup completed");
-          }
-          
-          if (onProgress) onProgress(95, "Finalizing...");
-          
-        } catch (mergeErr) {
-          console.error("Client-side merge failed:", mergeErr);
-          throw new Error(`Merge operation failed: ${mergeErr instanceof Error ? mergeErr.message : 'Unknown error'}`);
-        }
+      if (!uploadError) {
+        console.log(`Uploaded ${totalChunks} chunks successfully`);
       }
     } else {
       // Standard upload for smaller files with retry logic
@@ -219,13 +151,17 @@ export const mediaService = {
       }
       
       if (onProgress) {
-        onProgress(95, "Finalizing...");
+        onProgress(90, "Finalizing...");
       }
     }
 
     if (uploadError) {
       console.error("Error uploading media file:", uploadError);
       throw uploadError;
+    }
+
+    if (onProgress) {
+      onProgress(95, "Creating record...");
     }
 
     // Create media file record
@@ -238,7 +174,10 @@ export const mediaService = {
         name: file.name,
         file_type: fileType,
         storage_path: fileNameWithPath,
-        file_size: file.size
+        file_size: file.size,
+        is_chunked: isChunked,
+        total_chunks: isChunked ? totalChunks : null,
+        chunk_pattern: isChunked ? chunkPattern : null
       })
       .select()
       .single();
@@ -259,13 +198,22 @@ export const mediaService = {
     // Get media file to find storage path
     const { data: media } = await supabase
       .from("media_files")
-      .select("storage_path")
+      .select("storage_path, is_chunked, total_chunks")
       .eq("id", id)
       .single();
 
-    // Delete from storage
-    if (media?.storage_path) {
-      await supabase.storage.from("media").remove([media.storage_path]);
+    if (media) {
+      // If chunked, delete all chunks
+      if (media.is_chunked && media.total_chunks) {
+        const chunkPaths: string[] = [];
+        for (let i = 0; i < media.total_chunks; i++) {
+          chunkPaths.push(`${media.storage_path}.part${i}`);
+        }
+        await supabase.storage.from("media").remove(chunkPaths);
+      } else {
+        // Delete single file
+        await supabase.storage.from("media").remove([media.storage_path]);
+      }
     }
 
     // Delete record
@@ -318,8 +266,27 @@ export const mediaService = {
     return data;
   },
 
-  getMediaUrl(storagePath: string): string {
-    const { data } = supabase.storage.from("media").getPublicUrl(storagePath);
+  getMediaUrl(storagePath: string, isChunked?: boolean): string {
+    // For chunked files, return the first chunk
+    // The player will handle streaming remaining chunks
+    const path = isChunked ? `${storagePath}.part0` : storagePath;
+    const { data } = supabase.storage.from("media").getPublicUrl(path);
     return data.publicUrl;
+  },
+
+  // Helper function to get streaming URL for chunked media
+  async getChunkedMediaUrls(media: MediaFile): Promise<string[]> {
+    if (!media.is_chunked || !media.total_chunks) {
+      return [this.getMediaUrl(media.storage_path, false)];
+    }
+
+    const urls: string[] = [];
+    for (let i = 0; i < media.total_chunks; i++) {
+      const { data } = supabase.storage
+        .from("media")
+        .getPublicUrl(`${media.storage_path}.part${i}`);
+      urls.push(data.publicUrl);
+    }
+    return urls;
   }
 };

@@ -218,41 +218,50 @@ export type Database = {
       media_files: {
         Row: {
           ai_summary: string | null
+          chunk_pattern: string | null
           created_at: string | null
           duration_seconds: number | null
           file_size: number | null
           file_type: string
           folder_id: string | null
           id: string
+          is_chunked: boolean | null
           name: string
           project_id: string
           storage_path: string
+          total_chunks: number | null
           user_id: string
         }
         Insert: {
           ai_summary?: string | null
+          chunk_pattern?: string | null
           created_at?: string | null
           duration_seconds?: number | null
           file_size?: number | null
           file_type: string
           folder_id?: string | null
           id?: string
+          is_chunked?: boolean | null
           name: string
           project_id: string
           storage_path: string
+          total_chunks?: number | null
           user_id: string
         }
         Update: {
           ai_summary?: string | null
+          chunk_pattern?: string | null
           created_at?: string | null
           duration_seconds?: number | null
           file_size?: number | null
           file_type?: string
           folder_id?: string | null
           id?: string
+          is_chunked?: boolean | null
           name?: string
           project_id?: string
           storage_path?: string
+          total_chunks?: number | null
           user_id?: string
         }
         Relationships: [
