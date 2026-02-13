@@ -45,7 +45,7 @@ export default function ProjectWorkspace() {
     try {
       setLoading(true);
       const [projectData, docs, media] = await Promise.all([
-        projectService.getProjectById(projectId),
+        projectService.getProject(projectId),
         documentService.getDocuments(projectId),
         mediaService.getMediaFiles(projectId)
       ]);
@@ -92,7 +92,7 @@ export default function ProjectWorkspace() {
     if (!id || typeof id !== "string") return;
 
     try {
-      const media = await mediaService.uploadMedia(id, file);
+      const media = await mediaService.uploadMediaFile(id, file);
       setMediaFiles([...mediaFiles, media]);
       setSelectedMedia(media);
       toast({
@@ -274,7 +274,7 @@ export default function ProjectWorkspace() {
                             <p className="font-medium text-sm truncate">{media.name}</p>
                             <p className="text-xs text-slate-500 mt-1">
                               {media.file_type.toUpperCase()}
-                              {media.duration && ` • ${Math.floor(media.duration / 60)}m`}
+                              {media.duration_seconds && ` • ${Math.floor(media.duration_seconds / 60)}m`}
                             </p>
                           </div>
                         </div>

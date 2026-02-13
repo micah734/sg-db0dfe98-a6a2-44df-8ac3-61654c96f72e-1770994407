@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { type MediaFile } from "@/services/mediaService";
+import { mediaService, type MediaFile } from "@/services/mediaService";
 import { Play, Pause, Volume2, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -13,7 +13,26 @@ export function MediaPanel({ media }: MediaPanelProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [transcriptText, setTranscriptText] = useState<string | null>(null);
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
+
+  useEffect(() => {
+    if (media) {
+      loadTranscript(media.id);
+    } else {
+      setTranscriptText(null);
+    }
+  }, [media]);
+
+  async function loadTranscript(mediaId: string) {
+    try {
+      const transcriptData = await mediaService.getTranscript(mediaId);
+      setTranscriptText(transcriptData?.content || null);
+    } catch (error) {
+      console.error("Failed to load transcript", error);
+      setTranscriptText(null);
+    }
+  }
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -53,7 +72,6 @@ export function MediaPanel({ media }: MediaPanelProps) {
   if (!media) return null;
 
   const isVideo = media.file_type.startsWith("video");
-  const transcript = media.transcript;
 
   return (
     <div className="h-full flex flex-col bg-white border-l border-slate-200">
@@ -129,9 +147,9 @@ export function MediaPanel({ media }: MediaPanelProps) {
         <TabsContent value="transcript" className="flex-1 mt-0">
           <ScrollArea className="h-full">
             <div className="p-4 space-y-3">
-              {transcript ? (
+              {transcriptText ? (
                 <div className="text-sm text-slate-700 leading-relaxed">
-                  {transcript.split("\n").map((line, idx) => (
+                  {transcriptText.split("\n").map((line, idx) => (
                     <p key={idx} className="mb-2 hover:bg-indigo-50 p-2 rounded cursor-pointer transition-colors">
                       {line}
                     </p>
