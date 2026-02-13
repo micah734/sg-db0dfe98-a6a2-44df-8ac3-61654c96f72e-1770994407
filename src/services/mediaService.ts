@@ -113,7 +113,28 @@ export const mediaService = {
       }
 
       if (!uploadError && uploadedParts.length > 0) {
-        console.log(`Large file uploaded in ${uploadedParts.length} chunks. Files stored separately.`);
+        console.log(`Large file uploaded in ${uploadedParts.length} chunks. Merging...`);
+        
+        // Invoke Edge Function to merge chunks
+        try {
+          const { data: mergeData, error: mergeError } = await supabase.functions.invoke('merge-media-chunks', {
+            body: {
+              fileName,
+              totalChunks: chunks,
+              mimeType: file.type
+            }
+          });
+
+          if (mergeError) {
+            console.error("Error merging chunks:", mergeError);
+            throw new Error(`Failed to merge chunks: ${mergeError.message}`);
+          }
+
+          console.log("Chunks merged successfully:", mergeData);
+        } catch (mergeErr) {
+          console.error("Merge operation failed:", mergeErr);
+          throw new Error(`Chunk merge failed: ${mergeErr instanceof Error ? mergeErr.message : 'Unknown error'}`);
+        }
       }
     } else {
       // Standard upload for smaller files with retry logic

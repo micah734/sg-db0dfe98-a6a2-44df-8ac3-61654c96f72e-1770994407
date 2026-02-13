@@ -220,6 +220,7 @@ export type Database = {
           ai_summary: string | null
           created_at: string | null
           duration_seconds: number | null
+          file_size: number | null
           file_type: string
           folder_id: string | null
           id: string
@@ -232,6 +233,7 @@ export type Database = {
           ai_summary?: string | null
           created_at?: string | null
           duration_seconds?: number | null
+          file_size?: number | null
           file_type: string
           folder_id?: string | null
           id?: string
@@ -244,6 +246,7 @@ export type Database = {
           ai_summary?: string | null
           created_at?: string | null
           duration_seconds?: number | null
+          file_size?: number | null
           file_type?: string
           folder_id?: string | null
           id?: string
