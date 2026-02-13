@@ -95,6 +95,7 @@ serve(async (req) => {
     }
 
     // Update media_files record with final path and size
+    // Using 'name' instead of 'file_name' to match schema
     const { error: updateError } = await supabase
       .from("media_files")
       .update({
@@ -102,7 +103,7 @@ serve(async (req) => {
         file_size: fileSize
       })
       .eq("project_id", projectId)
-      .eq("file_name", fileName);
+      .eq("name", fileName);
 
     if (updateError) {
       console.error(`Warning: Failed to update database: ${updateError.message}`);

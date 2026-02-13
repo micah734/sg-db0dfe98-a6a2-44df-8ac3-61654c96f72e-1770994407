@@ -183,7 +183,7 @@ export const mediaService = {
         project_id: projectId,
         folder_id: folderId,
         user_id: user.id,
-        file_name: file.name,
+        name: file.name,
         file_type: fileType,
         storage_path: fileNameWithPath,
         file_size: file.size
