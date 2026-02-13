@@ -38,7 +38,8 @@ export const mediaService = {
   async uploadMediaFile(
     projectId: string,
     file: File,
-    folderId?: string
+    folderId?: string,
+    onProgress?: (progress: number) => void
   ): Promise<MediaFile> {
     const { data: { user } } = await supabase.auth.getUser();
     
@@ -50,9 +51,33 @@ export const mediaService = {
     // Upload file to Supabase Storage
     const fileName = `${user.id}/${projectId}/${Date.now()}_${file.name}`;
     
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from("media")
-      .upload(fileName, file);
+    // Use resumable upload for files larger than 6MB
+    const useResumable = file.size > 6 * 1024 * 1024;
+    
+    let uploadData;
+    let uploadError;
+
+    if (useResumable) {
+      // Resumable upload for large files
+      const { data, error } = await supabase.storage
+        .from("media")
+        .upload(fileName, file, {
+          cacheControl: "3600",
+          upsert: false,
+          duplex: "half"
+        });
+      
+      uploadData = data;
+      uploadError = error;
+    } else {
+      // Standard upload for smaller files
+      const { data, error } = await supabase.storage
+        .from("media")
+        .upload(fileName, file);
+      
+      uploadData = data;
+      uploadError = error;
+    }
 
     if (uploadError) {
       console.error("Error uploading media file:", uploadError);
@@ -68,7 +93,8 @@ export const mediaService = {
         user_id: user.id,
         name: file.name,
         file_type: fileType,
-        storage_path: uploadData.path
+        storage_path: uploadData.path,
+        file_size: file.size
       })
       .select()
       .single();
