@@ -1,65 +1,180 @@
 import { Button } from "@/components/ui/button";
-import { 
-  Highlighter, 
-  Pencil, 
-  Type, 
-  Square, 
-  Circle,
-  Eraser,
-  Undo2,
-  Redo2
+import { Separator } from "@/components/ui/separator";
+import {
+  Highlighter,
+  Pencil,
+  Type,
+  Square,
+  MousePointer,
+  Link,
+  Unlink,
+  Trash2,
 } from "lucide-react";
 import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
-export function AnnotationToolbar() {
+interface AnnotationToolbarProps {
+  currentTool: "highlight" | "drawing" | "text" | "shape" | "select";
+  onToolChange: (tool: "highlight" | "drawing" | "text" | "shape" | "select") => void;
+  currentColor: string;
+  onColorChange: (color: string) => void;
+  onLinkTimestamp?: () => void;
+  onUnlinkTimestamp?: () => void;
+  onDeleteAnnotation?: () => void;
+  hasSelectedAnnotation?: boolean;
+  isLinked?: boolean;
+}
+
+const PRESET_COLORS = [
+  "#FFFF00", // Yellow
+  "#FF6B6B", // Red
+  "#4ECDC4", // Teal
+  "#95E1D3", // Mint
+  "#FF9FF3", // Pink
+  "#FFA500", // Orange
+  "#98D8C8", // Green
+  "#A8E6CF", // Light Green
+];
+
+export function AnnotationToolbar({
+  currentTool,
+  onToolChange,
+  currentColor,
+  onColorChange,
+  onLinkTimestamp,
+  onUnlinkTimestamp,
+  onDeleteAnnotation,
+  hasSelectedAnnotation = false,
+  isLinked = false,
+}: AnnotationToolbarProps) {
   return (
-    <div className="flex items-center gap-2">
-      <ToggleGroup type="single" defaultValue="select">
-        <ToggleGroupItem value="highlight" aria-label="Highlight" size="sm">
-          <Highlighter className="w-4 h-4" />
-        </ToggleGroupItem>
-        <ToggleGroupItem value="draw" aria-label="Draw" size="sm">
-          <Pencil className="w-4 h-4" />
-        </ToggleGroupItem>
-        <ToggleGroupItem value="text" aria-label="Text" size="sm">
-          <Type className="w-4 h-4" />
-        </ToggleGroupItem>
-        <ToggleGroupItem value="rectangle" aria-label="Rectangle" size="sm">
-          <Square className="w-4 h-4" />
-        </ToggleGroupItem>
-        <ToggleGroupItem value="circle" aria-label="Circle" size="sm">
-          <Circle className="w-4 h-4" />
-        </ToggleGroupItem>
-        <ToggleGroupItem value="eraser" aria-label="Eraser" size="sm">
-          <Eraser className="w-4 h-4" />
-        </ToggleGroupItem>
-      </ToggleGroup>
-
-      <div className="h-4 w-px bg-slate-200 mx-1" />
-
-      <Button variant="ghost" size="sm">
-        <Undo2 className="w-4 h-4" />
-      </Button>
-      <Button variant="ghost" size="sm">
-        <Redo2 className="w-4 h-4" />
-      </Button>
-
-      <div className="h-4 w-px bg-slate-200 mx-1" />
-
-      {/* Color picker */}
-      <div className="flex gap-1">
-        {["#fef08a", "#86efac", "#7dd3fc", "#c4b5fd", "#fda4af"].map((color) => (
-          <button
-            key={color}
-            className="w-6 h-6 rounded border-2 border-slate-200 hover:border-slate-400 transition-colors"
-            style={{ backgroundColor: color }}
-            aria-label={`Color ${color}`}
-          />
-        ))}
+    <div className="flex items-center gap-2 p-2 bg-background border-b">
+      {/* Drawing Tools */}
+      <div className="flex items-center gap-1">
+        <Button
+          variant={currentTool === "select" ? "default" : "ghost"}
+          size="icon"
+          onClick={() => onToolChange("select")}
+          title="Select"
+        >
+          <MousePointer className="h-4 w-4" />
+        </Button>
+        
+        <Button
+          variant={currentTool === "highlight" ? "default" : "ghost"}
+          size="icon"
+          onClick={() => onToolChange("highlight")}
+          title="Highlight"
+        >
+          <Highlighter className="h-4 w-4" />
+        </Button>
+        
+        <Button
+          variant={currentTool === "drawing" ? "default" : "ghost"}
+          size="icon"
+          onClick={() => onToolChange("drawing")}
+          title="Freehand Draw"
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
+        
+        <Button
+          variant={currentTool === "text" ? "default" : "ghost"}
+          size="icon"
+          onClick={() => onToolChange("text")}
+          title="Text Note"
+        >
+          <Type className="h-4 w-4" />
+        </Button>
+        
+        <Button
+          variant={currentTool === "shape" ? "default" : "ghost"}
+          size="icon"
+          onClick={() => onToolChange("shape")}
+          title="Rectangle"
+        >
+          <Square className="h-4 w-4" />
+        </Button>
       </div>
+
+      <Separator orientation="vertical" className="h-8" />
+
+      {/* Color Picker */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="icon" title="Color">
+            <div
+              className="w-4 h-4 rounded border"
+              style={{ backgroundColor: currentColor }}
+            />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-2">
+          <div className="grid grid-cols-4 gap-2">
+            {PRESET_COLORS.map((color) => (
+              <button
+                key={color}
+                onClick={() => onColorChange(color)}
+                className="w-8 h-8 rounded border-2 hover:scale-110 transition-transform"
+                style={{
+                  backgroundColor: color,
+                  borderColor: color === currentColor ? "#000" : "transparent",
+                }}
+                title={color}
+              />
+            ))}
+          </div>
+          <Separator className="my-2" />
+          <input
+            type="color"
+            value={currentColor}
+            onChange={(e) => onColorChange(e.target.value)}
+            className="w-full h-8 cursor-pointer"
+          />
+        </PopoverContent>
+      </Popover>
+
+      <Separator orientation="vertical" className="h-8" />
+
+      {/* Timestamp Linking */}
+      {hasSelectedAnnotation && (
+        <>
+          {!isLinked ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onLinkTimestamp}
+              title="Link to Current Timestamp"
+              disabled={!onLinkTimestamp}
+            >
+              <Link className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onUnlinkTimestamp}
+              title="Unlink from Timestamp"
+              disabled={!onUnlinkTimestamp}
+            >
+              <Unlink className="h-4 w-4" />
+            </Button>
+          )}
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onDeleteAnnotation}
+            title="Delete Annotation"
+            disabled={!onDeleteAnnotation}
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </>
+      )}
     </div>
   );
 }
