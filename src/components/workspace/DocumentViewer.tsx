@@ -1,58 +1,118 @@
 import { useState, useRef, useEffect } from "react";
+import { Document as PDFDocument, Page as PDFPage, pdfjs } from "react-pdf";
 import { Document, type Document as DocumentType } from "@/services/documentService";
-import { FileText, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from "lucide-react";
+import { FileText, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import "react-pdf/dist/esm/Page/AnnotationLayer.css";
+import "react-pdf/dist/esm/Page/TextLayer.css";
+
+// Configure PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
 
 interface DocumentViewerProps {
   document: DocumentType | null;
+  onAnnotationCreate?: (annotation: any) => void;
 }
 
-export function DocumentViewer({ document }: DocumentViewerProps) {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [zoom, setZoom] = useState(100);
+export function DocumentViewer({ document, onAnnotationCreate }: DocumentViewerProps) {
+  const [numPages, setNumPages] = useState<number>(0);
+  const [pageNumber, setPageNumber] = useState<number>(1);
+  const [scale, setScale] = useState<number>(1.0);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
+  // Load PDF URL when document changes
   useEffect(() => {
     if (document) {
-      // In a real implementation, load PDF/DOCX and render
-      // For now, show placeholder
-      setCurrentPage(1);
-      setTotalPages(1);
+      setLoading(true);
+      setError(null);
+      setPdfUrl(document.storage_path);
+      setPageNumber(1);
+    } else {
+      setPdfUrl(null);
     }
   }, [document]);
+
+  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
+    setNumPages(numPages);
+    setLoading(false);
+    setError(null);
+  };
+
+  const onDocumentLoadError = (error: Error) => {
+    console.error("Error loading PDF:", error);
+    setError("Failed to load PDF. Please try again.");
+    setLoading(false);
+  };
+
+  const changePage = (offset: number) => {
+    setPageNumber(prevPageNumber => {
+      const newPageNumber = prevPageNumber + offset;
+      return Math.max(1, Math.min(newPageNumber, numPages));
+    });
+  };
+
+  const changeScale = (delta: number) => {
+    setScale(prevScale => {
+      const newScale = prevScale + delta;
+      return Math.max(0.5, Math.min(newScale, 2.5));
+    });
+  };
 
   if (!document) {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-slate-50 text-slate-400">
         <FileText className="w-16 h-16 mb-4 opacity-50" />
-        <p className="text-lg">No document selected</p>
+        <p className="text-lg font-medium">No document selected</p>
         <p className="text-sm mt-1">Upload or select a document to view</p>
       </div>
     );
   }
 
+  // Check if file is PDF
+  const isPDF = document.file_type === "pdf";
+
+  if (!isPDF) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center bg-slate-50 text-slate-600">
+        <FileText className="w-16 h-16 mb-4 opacity-50" />
+        <p className="text-lg font-medium">{document.name}</p>
+        <p className="text-sm mt-2">DOCX preview coming soon</p>
+        <div className="mt-4 text-xs text-slate-500 max-w-md text-center">
+          <p>To implement DOCX rendering, install:</p>
+          <code className="bg-slate-200 px-2 py-1 rounded mt-2 inline-block">
+            npm install mammoth docx-preview
+          </code>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="h-full flex flex-col bg-slate-100">
+    <div className="h-full flex flex-col bg-slate-100" ref={containerRef}>
       {/* Document Controls */}
-      <div className="bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-between">
+      <div className="bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-            disabled={currentPage === 1}
+            onClick={() => changePage(-1)}
+            disabled={pageNumber <= 1}
           >
             <ChevronLeft className="w-4 h-4" />
           </Button>
-          <span className="text-sm text-slate-600">
-            Page {currentPage} of {totalPages}
+          <span className="text-sm text-slate-600 min-w-[6rem] text-center font-medium">
+            Page {pageNumber} of {numPages || "?"}
           </span>
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-            disabled={currentPage === totalPages}
+            onClick={() => changePage(1)}
+            disabled={pageNumber >= numPages}
           >
             <ChevronRight className="w-4 h-4" />
           </Button>
@@ -62,59 +122,89 @@ export function DocumentViewer({ document }: DocumentViewerProps) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setZoom(Math.max(50, zoom - 25))}
+            onClick={() => changeScale(-0.25)}
+            disabled={scale <= 0.5}
           >
             <ZoomOut className="w-4 h-4" />
           </Button>
-          <span className="text-sm text-slate-600 min-w-[4rem] text-center">
-            {zoom}%
+          <span className="text-sm text-slate-600 min-w-[4rem] text-center font-medium">
+            {Math.round(scale * 100)}%
           </span>
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setZoom(Math.min(200, zoom + 25))}
+            onClick={() => changeScale(0.25)}
+            disabled={scale >= 2.5}
           >
             <ZoomIn className="w-4 h-4" />
           </Button>
         </div>
       </div>
 
-      {/* Document Canvas */}
-      <div className="flex-1 overflow-auto p-8">
-        <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-lg p-8 min-h-[11in]">
-          {/* Placeholder for PDF/DOCX rendering */}
-          <div className="space-y-4">
-            <div className="text-2xl font-bold text-slate-900 mb-6">
-              {document.name}
+      {/* PDF Viewer */}
+      <div className="flex-1 overflow-auto bg-slate-100 p-4">
+        <div className="max-w-5xl mx-auto">
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4 text-red-800">
+              <p className="font-medium">Error loading document</p>
+              <p className="text-sm mt-1">{error}</p>
             </div>
-            <div className="prose prose-slate max-w-none">
-              <p className="text-slate-600">
-                Document viewer placeholder. In production, this would render:
-              </p>
-              <ul>
-                <li>PDF files using PDF.js or react-pdf</li>
-                <li>DOCX files using mammoth.js or docx-preview</li>
-                <li>Canvas overlay for annotations (highlights, drawings, notes)</li>
-                <li>Interactive annotation layer with click handlers</li>
-              </ul>
-              <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mt-6">
-                <p className="text-sm text-indigo-900 font-medium">
-                  📄 Document: {document.name}
-                </p>
-                <p className="text-xs text-indigo-700 mt-1">
-                  Type: {document.file_type.toUpperCase()} • 
-                  Uploaded: {new Date(document.created_at || "").toLocaleDateString()}
-                </p>
+          )}
+
+          {loading && !error && (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+              <span className="ml-3 text-slate-600">Loading PDF...</span>
+            </div>
+          )}
+
+          <div className="relative">
+            <PDFDocument
+              file={pdfUrl}
+              onLoadSuccess={onDocumentLoadSuccess}
+              onLoadError={onDocumentLoadError}
+              loading={
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                </div>
+              }
+            >
+              <PDFPage
+                pageNumber={pageNumber}
+                scale={scale}
+                className="shadow-lg rounded-lg overflow-hidden"
+                renderTextLayer={true}
+                renderAnnotationLayer={true}
+              />
+            </PDFDocument>
+
+            {/* Canvas overlay for annotations */}
+            <canvas
+              ref={canvasRef}
+              className="absolute top-0 left-0 pointer-events-none"
+              style={{
+                transform: `scale(${scale})`,
+                transformOrigin: "top left"
+              }}
+            />
+          </div>
+
+          {/* Document Info */}
+          {!loading && !error && (
+            <div className="mt-4 bg-white border border-slate-200 rounded-lg p-4">
+              <div className="flex items-center justify-between text-sm">
+                <div>
+                  <span className="font-medium text-slate-900">{document.name}</span>
+                  <span className="text-slate-500 ml-2">
+                    • {document.file_type.toUpperCase()}
+                  </span>
+                </div>
+                <div className="text-slate-500">
+                  Uploaded {new Date(document.created_at || "").toLocaleDateString()}
+                </div>
               </div>
             </div>
-          </div>
-          
-          {/* Canvas for annotations overlay */}
-          <canvas
-            ref={canvasRef}
-            className="absolute inset-0 pointer-events-none opacity-0"
-            style={{ transform: `scale(${zoom / 100})` }}
-          />
+          )}
         </div>
       </div>
     </div>
