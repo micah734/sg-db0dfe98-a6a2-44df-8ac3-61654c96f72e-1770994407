@@ -67,6 +67,7 @@ export function DocumentViewer({
       width: viewport.width,
       height: viewport.height
     });
+    console.log("PDF page loaded, dimensions:", { width: viewport.width, height: viewport.height, scale });
   };
 
   const changePage = (offset: number) => {
@@ -212,6 +213,7 @@ export function DocumentViewer({
                     onAnnotationClick={onAnnotationSelect}
                   />
                 )}
+                {!pageDimensions && console.log("Waiting for page dimensions...")}
               </div>
             </PDFDocument>
           </div>

@@ -32,6 +32,11 @@ export function AnnotationCanvas({
   const [currentPath, setCurrentPath] = useState<{ x: number; y: number }[]>([]);
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
 
+  // Debug logging
+  useEffect(() => {
+    console.log("AnnotationCanvas mounted:", { documentId, pageNumber, width, height, scale, currentTool });
+  }, [documentId, pageNumber, width, height, scale, currentTool]);
+
   // Load annotations for current page
   useEffect(() => {
     loadAnnotations();
@@ -323,7 +328,11 @@ export function AnnotationCanvas({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       className="absolute top-0 left-0 cursor-crosshair"
-      style={{ pointerEvents: currentTool === "select" ? "auto" : "all" }}
+      style={{ 
+        pointerEvents: currentTool === "select" ? "auto" : "all",
+        zIndex: 10,
+        touchAction: "none"
+      }}
     />
   );
 }
